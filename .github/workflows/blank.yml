@@ -1,18 +1,43 @@
-            - name: Docker Setup Docker
-  # You may pin to the exact commit or the version.
-  # uses: docker/setup-docker-action@01efb57f882e3b1a22e7cf3501dbe51287b0ecb4
-  uses: docker/setup-docker-action@v4.0.0
-  with:
-    # Docker CE version. (e.g, v24.0.9)
-    version: # optional, default is latest
-    # Docker CE channel. (e.g, stable, edge or test)
-    channel: # optional
-    # Docker daemon JSON configuration
-    daemon-config: # optional
-    # Docker context name. (default setup-docker-action)
-    context: # optional
-    # Set DOCKER_HOST environment variable to docker socket path
-    set-host: # optional, default is false
-    # Enable Docker rootless mode
-    rootless: # optional, default is false
-          
+name: Run Xray with x-ui
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  setup-xray:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Remove conflicting packages
+      run: |
+        sudo apt-get remove -y containerd || true
+        sudo apt-get autoremove -y
+        sudo apt-get update
+
+    - name: Install Docker
+      run: |
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sudo sh get-docker.sh
+
+    - name: Verify Docker Installation
+      run: docker --version
+
+    - name: Pull x-ui Docker image
+      run: |
+        docker pull enwaiax/x-ui:latest
+
+    - name: Run x-ui container
+      run: |
+        docker run -d --name xui -p 54321:54321 -p 54322:54322 enwaiax/x-ui:latest
+
+    - name: List running containers
+      run: docker ps
+
+    - name: Test x-ui access
+      run: |
+        curl -I http://localhost:54321 || echo "x-ui server not responding"
