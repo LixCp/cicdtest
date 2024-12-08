@@ -19,12 +19,14 @@ jobs:
         curl -L -o xray.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
         unzip xray.zip
         chmod +x xray
-        mv xray /usr/local/bin/
+        sudo mv xray /usr/local/bin/
 
-    - name: Create Xray Configuration
+    - name: Create Xray Configuration Directory
+      run: sudo mkdir -p /etc/xray
+
+    - name: Create Xray Configuration File
       run: |
-        mkdir -p /etc/xray
-        cat <<EOF > /etc/xray/config.json
+        sudo tee /etc/xray/config.json > /dev/null <<EOF
         {
           "log": {
             "loglevel": "info"
@@ -59,12 +61,12 @@ jobs:
 
     - name: Start Xray Server
       run: |
-        nohup xray -config /etc/xray/config.json &
+        nohup sudo xray -config /etc/xray/config.json &
 
     - name: Generate VLESS Link
       id: generate_link
       run: |
-        CLIENT_ID=$(jq -r '.inbounds[0].settings.clients[0].id' /etc/xray/config.json)
+        CLIENT_ID=$(sudo jq -r '.inbounds[0].settings.clients[0].id' /etc/xray/config.json)
         echo "vless://${CLIENT_ID}@127.0.0.1:443?encryption=none" > vless_link.txt
 
     - name: Output VLESS Link
