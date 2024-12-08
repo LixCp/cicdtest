@@ -11,7 +11,7 @@ jobs:
     - name: Install Required Tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl wget unzip
+        sudo apt-get install -y curl wget unzip jq
 
     - name: Download and Install Xray
       run: |
@@ -63,11 +63,18 @@ jobs:
       run: |
         nohup sudo xray -config /etc/xray/config.json &
 
+    - name: Get Public IP Address
+      id: get_ip
+      run: |
+        PUBLIC_IP=$(curl -s ifconfig.me)
+        echo "::set-output name=ip::$PUBLIC_IP"
+
     - name: Generate VLESS Link
       id: generate_link
       run: |
         CLIENT_ID=$(sudo jq -r '.inbounds[0].settings.clients[0].id' /etc/xray/config.json)
-        echo "vless://${CLIENT_ID}@127.0.0.1:443?encryption=none" > vless_link.txt
+        PUBLIC_IP=${{ steps.get_ip.outputs.ip }}
+        echo "vless://${CLIENT_ID}@${PUBLIC_IP}:443?encryption=none" > vless_link.txt
 
     - name: Output VLESS Link
       run: |
