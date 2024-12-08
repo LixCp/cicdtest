@@ -1,0 +1,35 @@
+name: Run Xray with x-ui
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  setup-xray:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Docker
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker.io
+
+    - name: Pull x-ui Docker image
+      run: |
+        docker pull enwaiax/x-ui:latest
+
+    - name: Run x-ui container
+      run: |
+        docker run -d --name xui -p 54321:54321 -p 54322:54322 enwaiax/x-ui:latest
+
+    - name: List running containers (optional)
+      run: |
+        docker ps
+
+    - name: Access x-ui
+      run: |
+        curl -I http://localhost:54321
