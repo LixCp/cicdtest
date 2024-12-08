@@ -1,43 +1,81 @@
-name: Run Xray with x-ui
+name: Run Xray and Generate VLESS Link
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  setup-xray:
+  run-xray:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Remove conflicting packages
+    - name: Install Required Tools
       run: |
-        sudo apt-get remove -y containerd || true
-        sudo apt-get autoremove -y
         sudo apt-get update
+        sudo apt-get install -y curl wget unzip
 
-    - name: Install Docker
+    - name: Download and Install Xray
       run: |
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sudo sh get-docker.sh
+        mkdir -p xray && cd xray
+        curl -L -o xray.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+        unzip xray.zip
+        chmod +x xray
+        mv xray /usr/local/bin/
 
-    - name: Verify Docker Installation
-      run: docker --version
-
-    - name: Pull x-ui Docker image
+    - name: Create Xray Configuration
       run: |
-        docker pull enwaiax/x-ui:latest
+        mkdir -p /etc/xray
+        cat <<EOF > /etc/xray/config.json
+        {
+          "log": {
+            "loglevel": "info"
+          },
+          "inbounds": [
+            {
+              "port": 443,
+              "protocol": "vless",
+              "settings": {
+                "clients": [
+                  {
+                    "id": "$(uuidgen)",
+                    "level": 0,
+                    "email": "test@example.com"
+                  }
+                ],
+                "decryption": "none"
+              },
+              "streamSettings": {
+                "network": "tcp"
+              }
+            }
+          ],
+          "outbounds": [
+            {
+              "protocol": "freedom",
+              "settings": {}
+            }
+          ]
+        }
+        EOF
 
-    - name: Run x-ui container
+    - name: Start Xray Server
       run: |
-        docker run -d --name xui -p 54321:54321 -p 54322:54322 enwaiax/x-ui:latest
+        nohup xray -config /etc/xray/config.json &
 
-    - name: List running containers
-      run: docker ps
-
-    - name: Test x-ui access
+    - name: Generate VLESS Link
+      id: generate_link
       run: |
-        curl -I http://localhost:54321 || echo "x-ui server not responding"
+        CLIENT_ID=$(jq -r '.inbounds[0].settings.clients[0].id' /etc/xray/config.json)
+        echo "vless://${CLIENT_ID}@127.0.0.1:443?encryption=none" > vless_link.txt
+
+    - name: Output VLESS Link
+      run: |
+        cat vless_link.txt
+      continue-on-error: true
+
+    - name: Set VLESS Link as Output
+      id: output
+      run: echo "::set-output name=vless_link::$(cat vless_link.txt)"
+
+    - name: Display Link
+      run: |
+        echo "VLESS Link: ${{ steps.output.outputs.vless_link }}"
